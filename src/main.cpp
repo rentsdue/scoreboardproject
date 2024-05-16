@@ -21,7 +21,7 @@ int digit3 = 10; // Second right display
 int digit4 = 11; // Most right display
 
 // Define the states for digit control
-#define DIGIT_ON LOW
+#define DIGIT_ON  LOW
 #define DIGIT_OFF HIGH
 #define DISPLAY_BRIGHTNESS 500
 
