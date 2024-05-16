@@ -15,9 +15,9 @@ void setup() {
 
   // Print the initial scores
   lcd.setCursor(0, 0);
-  lcd.print("Player 1: 0");
+  lcd.print("Teacher: 0");
   lcd.setCursor(0, 1);
-  lcd.print("Player 2: 0");
+  lcd.print("Student: 0");
 
   // Set up the button pins as inputs with pull-up resistors
   pinMode(buttonPin1, INPUT_PULLUP);
