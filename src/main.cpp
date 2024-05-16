@@ -1,57 +1,243 @@
-#include <LiquidCrystal.h>
+#include <Arduino.h>
 
-// Initialize the library with the numbers of the interface pins
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+// Pin definitions for buttons
+const int buttonPin1 = 0;
+const int buttonPin2 = 12;
 
-const int buttonPin1 = 8;    // Player 1 button
-const int buttonPin2 = 9;    // Player 2 button
+// Variables to hold button states
+int buttonState1 = 0;
+int buttonState2 = 0;
 
-int score1 = 0;
-int score2 = 0;
+// Score digits for Team A and Team B
+int A = 0; // Tens digit of Team A's score
+int B = 0; // Ones digit of Team A's score
+int C = 0; // Tens digit of Team B's score
+int D = 0; // Ones digit of Team B's score
+
+// PWM pins for the 7-segment display digits
+int digit1 = 6; // Most left display
+int digit2 = 9; // Second left display
+int digit3 = 10; // Second right display
+int digit4 = 11; // Most right display
+
+// Define the states for digit control
+#define DIGIT_ON LOW
+#define DIGIT_OFF HIGH
+#define DISPLAY_BRIGHTNESS 500
+
+// Segment pin definitions
+int segA = 2;
+int segB = 3;
+int segC = 4;
+int segD = 5;
+int segE = A0; // Pin 6 is used by display 1 for its PWM function
+int segF = 7;
+int segG = 8;
 
 void setup() {
-  // Set up the LCD's number of columns and rows
-  lcd.begin(16, 2);
+  // Initialize button pins as input
+  pinMode(buttonPin1, INPUT);
+  pinMode(buttonPin2, INPUT);
+  
+  // Initialize segment pins as output
+  pinMode(segA, OUTPUT);
+  pinMode(segB, OUTPUT);
+  pinMode(segC, OUTPUT);
+  pinMode(segD, OUTPUT);
+  pinMode(segE, OUTPUT);
+  pinMode(segF, OUTPUT);
+  pinMode(segG, OUTPUT);
+  
+  // Initialize digit control pins as output
+  pinMode(digit1, OUTPUT);
+  pinMode(digit2, OUTPUT);
+  pinMode(digit3, OUTPUT);
+  pinMode(digit4, OUTPUT);
 
-  // Print the initial scores
-  lcd.setCursor(0, 0);
-  lcd.print("Player 1: 0");
-  lcd.setCursor(0, 1);
-  lcd.print("Player 2: 0");
-
-  // Set up the button pins as inputs with pull-up resistors
-  pinMode(buttonPin1, INPUT_PULLUP);
-  pinMode(buttonPin2, INPUT_PULLUP);
+  // Begin serial communication for debugging
+  Serial.begin(9600);
 }
 
 void loop() {
-  // Check if Player 1's button is pressed
-  if (digitalRead(buttonPin1) == LOW) {
-    delay(50); // Debounce delay
-    if (digitalRead(buttonPin1) == LOW) {
-      score1++;
-      updateScore(1, score1);
-      while (digitalRead(buttonPin1) == LOW); // Wait for button release
+  // Read button states
+  buttonState1 = digitalRead(buttonPin1);
+  buttonState2 = digitalRead(buttonPin2);
+
+  // Increase score for Team A if button 1 is pressed
+  if (buttonState1 == HIGH) {
+    B++;
+    if (B > 9) {
+      B = 0; // Reset to 0 if it reaches 10
+      A++;
+    }
+    if (A > 9) {
+      A = 0; // Prevent tens digit from exceeding 9
     }
   }
 
-  // Check if Player 2's button is pressed
-  if (digitalRead(buttonPin2) == LOW) {
-    delay(50); // Debounce delay
-    if (digitalRead(buttonPin2) == LOW) {
-      score2++;
-      updateScore(2, score2);
-      while (digitalRead(buttonPin2) == LOW); // Wait for button release
+  // Increase score for Team B if button 2 is pressed
+  if (buttonState2 == HIGH) {
+    D++;
+    if (D > 9) {
+      D = 0; // Reset to 0 if it reaches 10
+      C++;
+    }
+    if (C > 9) {
+      C = 0; // Prevent tens digit from exceeding 9
     }
   }
+
+  // Display scores for Team A and Team B
+  displayScore(A, B, C, D);
+
+  // Print scores to serial monitor for debugging
+  Serial.print("Team A: ");
+  Serial.println(A * 10 + B); // Convert tens and ones to a single number
+  Serial.print("Team B: ");
+  Serial.println(C * 10 + D); // Convert tens and ones to a single number
 }
 
-void updateScore(int player, int score) {
-  if (player == 1) {
-    lcd.setCursor(10, 0);
-    lcd.print(score);
-  } else if (player == 2) {
-    lcd.setCursor(10, 1);
-    lcd.print(score);
+void displayScore(int scoreA_tens, int scoreA_ones, int scoreB_tens, int scoreB_ones) {
+  // Display Team A score on the left side
+  displayNumber(scoreA_tens, digit1, digit2);
+  B = scoreA_ones;
+
+  // Display Team B score on the right side
+  displayNumber(scoreB_tens, digit3, digit4);
+  D = scoreB_ones;
+}
+
+void displayNumber(int numberToDisplay, int digitLeft, int digitRight) {
+  // Extract each digit of the score
+  int thousands = numberToDisplay / 1000;
+  int hundreds = (numberToDisplay % 1000) / 100;
+  int tens = (numberToDisplay % 100) / 10;
+  int ones = numberToDisplay % 10;
+
+  // Turn off all digits initially
+  digitalWrite(digit1, DIGIT_OFF);
+  digitalWrite(digit2, DIGIT_OFF);
+  digitalWrite(digit3, DIGIT_OFF);
+  digitalWrite(digit4, DIGIT_OFF);
+
+  // Display each digit sequentially
+  digitalWrite(digitLeft, DIGIT_ON);
+  lightNumber(thousands);
+  delayMicroseconds(DISPLAY_BRIGHTNESS);
+  digitalWrite(digitLeft, DIGIT_OFF);
+
+  digitalWrite(digitRight, DIGIT_ON);
+  lightNumber(hundreds);
+  delayMicroseconds(DISPLAY_BRIGHTNESS);
+  digitalWrite(digitRight, DIGIT_OFF);
+
+  digitalWrite(digitLeft, DIGIT_ON);
+  lightNumber(tens);
+  delayMicroseconds(DISPLAY_BRIGHTNESS);
+  digitalWrite(digitLeft, DIGIT_OFF);
+
+  digitalWrite(digitRight, DIGIT_ON);
+  lightNumber(ones);
+  delayMicroseconds(DISPLAY_BRIGHTNESS);
+  digitalWrite(digitRight, DIGIT_OFF);
+}
+
+void lightNumber(int numberToDisplay) {
+  // Define segment states
+  #define SEGMENT_ON  HIGH
+  #define SEGMENT_OFF LOW
+
+  // Control segments to display the corresponding number
+  switch (numberToDisplay) {
+    case 0:
+      digitalWrite(segA, SEGMENT_ON);
+      digitalWrite(segB, SEGMENT_ON);
+      digitalWrite(segC, SEGMENT_ON);
+      digitalWrite(segD, SEGMENT_ON);
+      digitalWrite(segE, SEGMENT_ON);
+      digitalWrite(segF, SEGMENT_ON);
+      digitalWrite(segG, SEGMENT_OFF);
+      break;
+    case 1:
+      digitalWrite(segA, SEGMENT_OFF);
+      digitalWrite(segB, SEGMENT_ON);
+      digitalWrite(segC, SEGMENT_ON);
+      digitalWrite(segD, SEGMENT_OFF);
+      digitalWrite(segE, SEGMENT_OFF);
+      digitalWrite(segF, SEGMENT_OFF);
+      digitalWrite(segG, SEGMENT_OFF);
+      break;
+    case 2:
+      digitalWrite(segA, SEGMENT_ON);
+      digitalWrite(segB, SEGMENT_ON);
+      digitalWrite(segC, SEGMENT_OFF);
+      digitalWrite(segD, SEGMENT_ON);
+      digitalWrite(segE, SEGMENT_ON);
+      digitalWrite(segF, SEGMENT_OFF);
+      digitalWrite(segG, SEGMENT_ON);
+      break;
+    case 3:
+      digitalWrite(segA, SEGMENT_ON);
+      digitalWrite(segB, SEGMENT_ON);
+      digitalWrite(segC, SEGMENT_ON);
+      digitalWrite(segD, SEGMENT_ON);
+      digitalWrite(segE, SEGMENT_OFF);
+      digitalWrite(segF, SEGMENT_OFF);
+      digitalWrite(segG, SEGMENT_ON);
+      break;
+    case 4:
+      digitalWrite(segA, SEGMENT_OFF);
+      digitalWrite(segB, SEGMENT_ON);
+      digitalWrite(segC, SEGMENT_ON);
+      digitalWrite(segD, SEGMENT_OFF);
+      digitalWrite(segE, SEGMENT_OFF);
+      digitalWrite(segF, SEGMENT_ON);
+      digitalWrite(segG, SEGMENT_ON);
+      break;
+    case 5:
+      digitalWrite(segA, SEGMENT_ON);
+      digitalWrite(segB, SEGMENT_OFF);
+      digitalWrite(segC, SEGMENT_ON);
+      digitalWrite(segD, SEGMENT_ON);
+      digitalWrite(segE, SEGMENT_OFF);
+      digitalWrite(segF, SEGMENT_ON);
+      digitalWrite(segG, SEGMENT_ON);
+      break;
+    case 6:
+      digitalWrite(segA, SEGMENT_ON);
+      digitalWrite(segB, SEGMENT_OFF);
+      digitalWrite(segC, SEGMENT_ON);
+      digitalWrite(segD, SEGMENT_ON);
+      digitalWrite(segE, SEGMENT_ON);
+      digitalWrite(segF, SEGMENT_ON);
+      digitalWrite(segG, SEGMENT_ON);
+      break;
+    case 7:
+      digitalWrite(segA, SEGMENT_ON);
+      digitalWrite(segB, SEGMENT_ON);
+      digitalWrite(segC, SEGMENT_ON);
+      digitalWrite(segD, SEGMENT_OFF);
+      digitalWrite(segE, SEGMENT_OFF);
+      digitalWrite(segF, SEGMENT_OFF);
+      digitalWrite(segG, SEGMENT_OFF);
+      break;
+    case 8:
+      digitalWrite(segA, SEGMENT_ON);
+      digitalWrite(segB, SEGMENT_ON);
+      digitalWrite(segC, SEGMENT_ON);
+      digitalWrite(segD, SEGMENT_ON);
+      digitalWrite(segE, SEGMENT_ON);
+      digitalWrite(segF, SEGMENT_ON);
+      digitalWrite(segG, SEGMENT_ON);
+      break;
+    case 9:
+      digitalWrite(segA, SEGMENT_ON);
+      digitalWrite(segB, SEGMENT_ON);
+      digitalWrite(segC, SEGMENT_ON);
+      digitalWrite(segD, SEGMENT_ON);
+      digitalWrite(segE, SEGMENT_OFF);
+      digitalWrite(segF, SEGMENT_ON);
+      digitalWrite(segG, SEGMENT_ON);
+      break;
   }
 }
